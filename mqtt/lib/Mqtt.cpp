@@ -205,11 +205,10 @@ std::vector<std::string> static myformat(const std::string& prefix,
 
 // 2025-05-28 17:46:11 0000000014358
 // Добавляем [[maybe_unused]]
-static const std::string
-    [[maybe_unused]] formatAsLogString(const std::string& prefix, const std::string& headLine, const std::string& message) {
+static const std::string formatAsLogString(const std::string& prefix, const std::string& headLine, const std::string& message) {
     std::ostringstream formatAsLogStringStream;
     for (const std::string& line : myformat(prefix, headLine, message, 34)) {
-        formatAsLogStringStream << (formatAsLogStringStream.view().empty() ? "" : "                                  ") << line << "\n";
+        formatAsLogStringStream << (formatAsLogStringStream.str().empty() ? "" : "                                  ") << line << "\n";
     }
     std::string formatStr = formatAsLogStringStream.str();
     formatStr.pop_back();
