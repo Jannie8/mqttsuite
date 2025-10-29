@@ -76,7 +76,7 @@
 using json = nlohmann::json;
 
 // get current terminal width, fallback to 80
-static int getTerminalWidth() {
+[[maybe_unused]] static int getTerminalWidth() {
     int termWidth = 80;
 
     struct winsize w;
@@ -88,7 +88,7 @@ static int getTerminalWidth() {
 }
 
 // split one paragraph of text into lines of at most `width` characters
-static std::vector<std::string> wrapParagraph(const std::string& text, std::size_t width) {
+[[maybe_unused]] static std::vector<std::string> wrapParagraph(const std::string& text, std::size_t width) {
     std::istringstream words(text);
     std::string word, line;
     std::vector<std::string> lines;
