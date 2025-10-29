@@ -422,14 +422,14 @@ namespace mqtt::mqtt::lib {
 
         if (fPort == 2) {
             // pH measurement
-            double ph = payload["ph"] == nullptr ? 0.0 : payload["ph"];
+            double ph = payload.contains("ph") ? payload["ph"].get<double>() : 0.0;
 
             query = "INSERT INTO PH_Readings (DeviceID, PH_Value, Timestamp) VALUES ('" +
                     deviceID + "', " + std::to_string(ph) + ", " + timestamp + ");";
         }
         else if (fPort == 3) {
             // TDS measurement
-            double tds = payload["tds"] == nullptr ? 0.0 : payload["tds"];
+            double tds = payload.contains("tds") ? payload["tds"].get<double>() : 0.0;
 
             query = "INSERT INTO TDS_Readings (DeviceID, TDS_Value, Timestamp) VALUES ('" +
                     deviceID + "', " + std::to_string(tds) + ", " + timestamp + ");";
