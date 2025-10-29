@@ -376,84 +376,26 @@ namespace mqtt::mqtt::lib {
     }
 
     void Mqtt::onPublish(const iot::mqtt::packets::Publish& publish) {
-        std::string prefix = "MQTT Publish";
-        std::string headLine = publish.getTopic() + " │ QoS: " + std::to_string(static_cast<uint16_t>(publish.getQoS())) +
-                               " │ Retain: " + (publish.getRetain() != 0 ? "true" : "false") +
-                               " │ Dup: " + (publish.getDup() != 0 ? "true" : "false");
+        VLOG(0) << "Received MQTT message, performing dummy DB insert...";
 
-        VLOG(0) << formatAsLogString(prefix, headLine, publish.getMessage());
+        std::string dummyQuery = "INSERT INTO TDS_Readings (DeviceID, TDS_Value) VALUES (1, 123.45);";
 
-        nlohmann::json messageAsJSON = nlohmann::json::parse(publish.getMessage());
-
-        // Here you can analyse and retrieve data from the json (j
-        // and decide on base of the fPort what to do with the data
-        // Maybe store it into a particular db table ...
-        // E.g.:
-
-        VLOG(0) << "ApplicationId: " << messageAsJSON["end_device_ids"]["application_ids"]["application_id"];
-
-        VLOG(0) << "Uplink message field\n" << messageAsJSON["uplink_message"].dump(4);
-        VLOG(0) << "Decoded payload field\n" << messageAsJSON["uplink_message"]["decoded_payload"].dump(4);
-
-        VLOG(0) << "DeviceID: " << messageAsJSON["end_device_ids"]["device_id"];
-        VLOG(0) << "DeviceEUI: " << messageAsJSON["end_device_ids"]["dev_eui"];
-        VLOG(0) << "Received at: " << messageAsJSON["received_at"];
-        for (const auto& rx_metadata : messageAsJSON["uplink_message"]["rx_metadata"]) {
-            VLOG(0) << "Received via GW: " << rx_metadata["gateway_ids"]["gateway_id"];
-        }
-
-        VLOG(0) << "MessageCnt: " << messageAsJSON["uplink_message"]["f_cnt"];
-        VLOG(0) << "F-Port field: " << messageAsJSON["uplink_message"]["f_port"];
-        VLOG(0) << "Frm payload field: " << messageAsJSON["uplink_message"]["frm_payload"];
-        VLOG(0) << "Frm payload base64 decoded: " << base64::base64_decode(messageAsJSON["uplink_message"]["frm_payload"]);
-
-                // Extract needed fields
-        int fPort = messageAsJSON["uplink_message"]["f_port"];
-        auto payload = messageAsJSON["uplink_message"]["decoded_payload"];
-
-        // Device ID (String → escape quotes)
-        std::string deviceID = messageAsJSON["end_device_ids"]["device_id"];
-        std::replace(deviceID.begin(), deviceID.end(), '\'', '_');
-
-        // Get a timestamp (using server time)
-        std::string timestamp = "NOW()";
-
-        std::string query;
-
-        if (fPort == 2) {
-            // pH measurement
-            double ph = payload.contains("ph") ? payload["ph"].get<double>() : 0.0;
-
-            query = "INSERT INTO PH_Readings (DeviceID, PH_Value, Timestamp) VALUES ('" +
-                    deviceID + "', " + std::to_string(ph) + ", " + timestamp + ");";
-        }
-        else if (fPort == 3) {
-            // TDS measurement
-            double tds = payload.contains("tds") ? payload["tds"].get<double>() : 0.0;
-
-            query = "INSERT INTO TDS_Readings (DeviceID, TDS_Value, Timestamp) VALUES ('" +
-                    deviceID + "', " + std::to_string(tds) + ", " + timestamp + ");";
-        }
-        else {
-            return; // Ignore other ports
-        }
-
-        // Execute DB query
         mariaDB.exec(
-            query,
+            dummyQuery,
             [&mariaDB = this->mariaDB]() -> void {
-                VLOG(0) << "DB Insert OK";
+                VLOG(0) << "Dummy insert OK";
                 mariaDB.affectedRows(
-                    [](my_ulonglong rows) { VLOG(0) << "   rows: " << rows; },
-                    [](const std::string &err, unsigned int num) {
-                        VLOG(0) << "DB Error (affrows): " << err << " : " << num;
+                    [](my_ulonglong rows) {
+                        VLOG(0) << "   rows affected: " << rows;
+                    },
+                    [](const std::string& err, unsigned int num) {
+                        VLOG(0) << "DB Error (affectedRows): " << err << " : " << num;
                     });
             },
-            [](const std::string &err, unsigned int num) {
-                VLOG(0) << "DB Insert FAILED: " << err << " : " << num;
-            }
-        );
-    };
+            [](const std::string& err, unsigned int num) {
+                VLOG(0) << "Dummy insert FAILED: " << err << " : " << num;
+            });
+    }
 
     void Mqtt::onPuback([[maybe_unused]] const iot::mqtt::packets::Puback& puback) {
         if (subTopics.empty()) {
