@@ -409,7 +409,7 @@ namespace mqtt::mqtt::lib {
 
         // This insert is just a dummy insert ...
         mariaDB.exec(
-            "INSERT INTO `SensorDataDB`(`username`, `password`) VALUES ('Annett','" + publish.getMessage() + "')",
+            "INSERT INTO `PH_Readings`(`DeviceID`, `SensorName`, `PH_Value`) VALUES (1, 'pH_Sensor', 7.2)",
             [&mariaDB = this->mariaDB](void) -> void {
                 VLOG(0) << "Query finished";
                 mariaDB.affectedRows(
@@ -423,7 +423,6 @@ namespace mqtt::mqtt::lib {
             [](const std::string& errorString, unsigned int errorNumber) -> void {
                 VLOG(0) << "Query failed: " << errorString << " : " << errorNumber;
             });
-        // End of dummy insert
     };
 
     void Mqtt::onPuback([[maybe_unused]] const iot::mqtt::packets::Puback& puback) {
