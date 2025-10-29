@@ -409,7 +409,7 @@ namespace mqtt::mqtt::lib {
 
         // This insert is just a dummy insert ...
         mariaDB.exec(
-            "INSERT INTO `snodec`(`username`, `password`) VALUES ('Annett','" + publish.getMessage() + "')",
+            "INSERT INTO `SensorDataDB`(`username`, `password`) VALUES ('Annett','" + publish.getMessage() + "')",
             [&mariaDB = this->mariaDB](void) -> void {
                 VLOG(0) << "Query finished";
                 mariaDB.affectedRows(
