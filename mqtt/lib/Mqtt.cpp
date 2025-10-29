@@ -376,6 +376,7 @@ namespace mqtt::mqtt::lib {
     }
 
     void Mqtt::onPublish(const iot::mqtt::packets::Publish& publish) {
+        (void) publish;
         VLOG(0) << "Received MQTT message, performing dummy DB insert...";
 
         std::string dummyQuery = "INSERT INTO TDS_Readings (DeviceID, TDS_Value) VALUES (1, 123.45);";
