@@ -407,22 +407,52 @@ namespace mqtt::mqtt::lib {
         VLOG(0) << "Frm payload field: " << messageAsJSON["uplink_message"]["frm_payload"];
         VLOG(0) << "Frm payload base64 decoded: " << base64::base64_decode(messageAsJSON["uplink_message"]["frm_payload"]);
 
-        // This insert is just a dummy insert ...
+                // Extract needed fields
+        int fPort = messageAsJSON["uplink_message"]["f_port"];
+        auto payload = messageAsJSON["uplink_message"]["decoded_payload"];
+
+        // Device ID (String → escape quotes)
+        std::string deviceID = messageAsJSON["end_device_ids"]["device_id"];
+        std::replace(deviceID.begin(), deviceID.end(), '\'', '_');
+
+        // Get a timestamp (using server time)
+        std::string timestamp = "NOW()";
+
+        std::string query;
+
+        if (fPort == 2) {
+            // pH measurement
+            double ph = payload["ph"] == nullptr ? 0.0 : payload["ph"];
+
+            query = "INSERT INTO PH_Readings (DeviceID, PH_Value, Timestamp) VALUES ('" +
+                    deviceID + "', " + std::to_string(ph) + ", " + timestamp + ");";
+        }
+        else if (fPort == 3) {
+            // TDS measurement
+            double tds = payload["tds"] == nullptr ? 0.0 : payload["tds"];
+
+            query = "INSERT INTO TDS_Readings (DeviceID, TDS_Value, Timestamp) VALUES ('" +
+                    deviceID + "', " + std::to_string(tds) + ", " + timestamp + ");";
+        }
+        else {
+            return; // Ignore other ports
+        }
+
+        // Execute DB query
         mariaDB.exec(
-            "INSERT INTO `PH_Readings`(`DeviceID`, `SensorName`, `PH_Value`) VALUES (1, 'pH_Sensor', 7.2)",
-            [&mariaDB = this->mariaDB](void) -> void {
-                VLOG(0) << "Query finished";
+            query,
+            [&mariaDB = this->mariaDB]() -> void {
+                VLOG(0) << "DB Insert OK";
                 mariaDB.affectedRows(
-                    [](my_ulonglong affectedRows) -> void {
-                        VLOG(0) << "  successful: affected rows = " << affectedRows;
-                    },
-                    [](const std::string& errorString, unsigned int errorNumber) -> void {
-                        VLOG(0) << "  with error: " << errorString << " : " << errorNumber;
+                    [](my_ulonglong rows) { VLOG(0) << "   rows: " << rows; },
+                    [](const std::string &err, unsigned int num) {
+                        VLOG(0) << "DB Error (affrows): " << err << " : " << num;
                     });
             },
-            [](const std::string& errorString, unsigned int errorNumber) -> void {
-                VLOG(0) << "Query failed: " << errorString << " : " << errorNumber;
-            });
+            [](const std::string &err, unsigned int num) {
+                VLOG(0) << "DB Insert FAILED: " << err << " : " << num;
+            }
+        );
     };
 
     void Mqtt::onPuback([[maybe_unused]] const iot::mqtt::packets::Puback& puback) {
