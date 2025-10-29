@@ -202,7 +202,7 @@ std::vector<std::string> static myformat(const std::string& prefix,
 
     return lines;
 }
-
+/*
 // 2025-05-28 17:46:11 0000000014358
 // Добавляем [[maybe_unused]]
 static const std::string formatAsLogString(const std::string& prefix, const std::string& headLine, const std::string& message) {
@@ -214,6 +214,7 @@ static const std::string formatAsLogString(const std::string& prefix, const std:
     formatStr.pop_back();
     return formatStr;
 }
+*/
 
 namespace mqtt::mqtt::lib {
 
