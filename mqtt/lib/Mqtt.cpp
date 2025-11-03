@@ -488,53 +488,7 @@ namespace mqtt::mqtt::lib {
                 break;
             }
 
-            case 2: { // Temperature
-                if (values.empty()) {
-                    VLOG(0) << "No value for Temperature";
-                    break;
-                }
-
-                float temp = values[0];
-
-                std::string query1 =
-                    "INSERT INTO Temperature_Readings (DeviceID, Temperature_Value) VALUES (" +
-                    std::to_string(deviceId) + ", " +
-                    std::to_string(temp) + ");";
-
-                std::string query2 =
-                    "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
-                    std::to_string(deviceId) + ", 'Temperature', " +
-                    std::to_string(temp) + ");";
-
-                mariaDB.exec(
-                    query1,
-                    [&mariaDB = this->mariaDB]() {
-                        VLOG(0) << "Temp query1 finished";
-                        mariaDB.affectedRows(
-                            [](my_ulonglong ar) { VLOG(0) << "  affected rows = " << ar; },
-                            [](const std::string& err, unsigned int no) { VLOG(0) << "  affectedRows error: " << err << " : " << no; });
-                    },
-                    [](const std::string& err, unsigned int no) {
-                        VLOG(0) << "Temp query1 failed: " << err << " : " << no;
-                    });
-
-                mariaDB.exec(
-                    query2,
-                    [&mariaDB = this->mariaDB]() {
-                        VLOG(0) << "Temp query2 finished";
-                        mariaDB.affectedRows(
-                            [](my_ulonglong ar) { VLOG(0) << "  affected rows = " << ar; },
-                            [](const std::string& err, unsigned int no) { VLOG(0) << "  affectedRows error: " << err << " : " << no; });
-                    },
-                    [](const std::string& err, unsigned int no) {
-                        VLOG(0) << "Temp query2 failed: " << err << " : " << no;
-                    });
-
-                VLOG(0) << "Temperature data inserted: " << temp;
-                break;
-            }
-
-            case 3: { // PH
+            case 2: { // PH
                 if (values.empty()) {
                     VLOG(0) << "No value for PH";
                     break;
@@ -577,10 +531,11 @@ namespace mqtt::mqtt::lib {
                     });
 
                 VLOG(0) << "PH data inserted: " << ph;
+                
                 break;
             }
 
-            case 4: { // TDS
+            case 3: { // TDS
                 if (values.empty()) {
                     VLOG(0) << "No value for TDS";
                     break;
@@ -623,6 +578,52 @@ namespace mqtt::mqtt::lib {
                     });
 
                 VLOG(0) << "TDS data inserted: " << tds;
+                break;
+            }
+
+            case 4: { // Temperature
+                if (values.empty()) {
+                    VLOG(0) << "No value for Temperature";
+                    break;
+                }
+
+                float temp = values[0];
+
+                std::string query1 =
+                    "INSERT INTO Temperature_Readings (DeviceID, Temperature_Value) VALUES (" +
+                    std::to_string(deviceId) + ", " +
+                    std::to_string(temp) + ");";
+
+                std::string query2 =
+                    "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
+                    std::to_string(deviceId) + ", 'Temperature', " +
+                    std::to_string(temp) + ");";
+
+                mariaDB.exec(
+                    query1,
+                    [&mariaDB = this->mariaDB]() {
+                        VLOG(0) << "Temp query1 finished";
+                        mariaDB.affectedRows(
+                            [](my_ulonglong ar) { VLOG(0) << "  affected rows = " << ar; },
+                            [](const std::string& err, unsigned int no) { VLOG(0) << "  affectedRows error: " << err << " : " << no; });
+                    },
+                    [](const std::string& err, unsigned int no) {
+                        VLOG(0) << "Temp query1 failed: " << err << " : " << no;
+                    });
+
+                mariaDB.exec(
+                    query2,
+                    [&mariaDB = this->mariaDB]() {
+                        VLOG(0) << "Temp query2 finished";
+                        mariaDB.affectedRows(
+                            [](my_ulonglong ar) { VLOG(0) << "  affected rows = " << ar; },
+                            [](const std::string& err, unsigned int no) { VLOG(0) << "  affectedRows error: " << err << " : " << no; });
+                    },
+                    [](const std::string& err, unsigned int no) {
+                        VLOG(0) << "Temp query2 failed: " << err << " : " << no;
+                    });
+
+                VLOG(0) << "Temperature data inserted: " << temp;
                 break;
             }
 
