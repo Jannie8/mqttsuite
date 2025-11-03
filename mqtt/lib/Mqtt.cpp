@@ -375,11 +375,35 @@ namespace mqtt::mqtt::lib {
     }
 
     void Mqtt::onPublish(const iot::mqtt::packets::Publish& publish) {
+        // --- Log topic and payload ---
+        std::string topic = publish.getTopic();
+        const std::vector<uint8_t>& payloadVec = publish.getPayload(); // assume getPayload() returns vector<uint8_t>
+
+        std::ostringstream payloadHex;
+        for (auto b : payloadVec)
+            payloadHex << std::hex << std::uppercase << (int) b << " ";
         VLOG(0) << "Received MQTT message";
+        VLOG(0) << "  Topic: " << topic;
+        VLOG(0) << "  Payload (hex): " << payloadHex.str();
 
-        // Convert payload bytes to string
-        std::string payloadStr(publish.payload.begin(), publish.payload.end());
+        // --- Convert payload to string ---
+        std::string payloadStr(payloadVec.begin(), payloadVec.end());
+        VLOG(0) << "  Payload (string): " << payloadStr;
 
+        // --- Determine fPort and deviceId ---
+        uint8_t fPort = 1; // <- replace with actual value if available in payload or topic
+        int deviceId = 1;  // <- can be extracted from topic, e.g., "devices/1/temperature"
+
+        // Attempt to extract deviceId from topic: "devices/<id>/..."
+        {
+            std::regex rgx("devices/(\\d+)/");
+            std::smatch match;
+            if (std::regex_search(topic, match, rgx)) {
+                deviceId = std::stoi(match[1].str());
+            }
+        }
+
+        // --- Parse payload into numeric values ---
         std::vector<float> values;
         std::istringstream ss(payloadStr);
         std::string token;
@@ -391,9 +415,7 @@ namespace mqtt::mqtt::lib {
             }
         }
 
-        uint8_t fPort = 1; // <- заменить на реальное значение, если есть
-        int deviceId = 1;  // <- назначаем DeviceID, можно разбирать из topic или payload
-
+        // --- Store data into appropriate tables ---
         try {
             switch (fPort) {
                 case 1: { // GPS
@@ -401,56 +423,67 @@ namespace mqtt::mqtt::lib {
                     float lon = values.size() > 1 ? values[1] : 0.0f;
                     float alt = values.size() > 2 ? values[2] : 0.0f;
 
-                    std::ostringstream query;
-                    query << "INSERT INTO GPS_Readings (DeviceID, Latitude, Longitude, Altitude) VALUES (" << deviceId << ", " << lat
-                          << ", " << lon << ", " << alt << ");";
-                    mariaDB.exec(query.str(), nullptr, nullptr);
+                    // Insert into GPS_Readings
+                    mariaDB.exec("INSERT INTO GPS_Readings (DeviceID, Latitude, Longitude, Altitude) VALUES (" + std::to_string(deviceId) +
+                                     ", " + std::to_string(lat) + ", " + std::to_string(lon) + ", " + std::to_string(alt) + ");",
+                                 nullptr,
+                                 nullptr);
 
-                    std::ostringstream allQuery;
-                    allQuery
-                        << "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1, ReadingValue2, ReadingValue3) VALUES ("
-                        << deviceId << ", 'GPS', " << lat << ", " << lon << ", " << alt << ");";
-                    mariaDB.exec(allQuery.str(), nullptr, nullptr);
-
+                    // Insert into All_Sensor_Readings
+                    mariaDB.exec(
+                        "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1, ReadingValue2, ReadingValue3) VALUES (" +
+                            std::to_string(deviceId) + ", 'GPS', " + std::to_string(lat) + ", " + std::to_string(lon) + ", " +
+                            std::to_string(alt) + ");",
+                        nullptr,
+                        nullptr);
                     break;
                 }
                 case 2: { // Temperature
                     float temp = values.size() > 0 ? values[0] : 0.0f;
-                    std::ostringstream query;
-                    query << "INSERT INTO Temperature_Readings (DeviceID, Temperature_Value) VALUES (" << deviceId << ", " << temp << ");";
-                    mariaDB.exec(query.str(), nullptr, nullptr);
 
-                    std::ostringstream allQuery;
-                    allQuery << "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" << deviceId
-                             << ", 'Temperature', " << temp << ");";
-                    mariaDB.exec(allQuery.str(), nullptr, nullptr);
+                    // Insert into Temperature_Readings
+                    mariaDB.exec("INSERT INTO Temperature_Readings (DeviceID, Temperature_Value) VALUES (" + std::to_string(deviceId) +
+                                     ", " + std::to_string(temp) + ");",
+                                 nullptr,
+                                 nullptr);
 
+                    // Insert into All_Sensor_Readings
+                    mariaDB.exec("INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
+                                     std::to_string(deviceId) + ", 'Temperature', " + std::to_string(temp) + ");",
+                                 nullptr,
+                                 nullptr);
                     break;
                 }
                 case 3: { // PH
                     float ph = values.size() > 0 ? values[0] : 0.0f;
-                    std::ostringstream query;
-                    query << "INSERT INTO PH_Readings (DeviceID, PH_Value) VALUES (" << deviceId << ", " << ph << ");";
-                    mariaDB.exec(query.str(), nullptr, nullptr);
 
-                    std::ostringstream allQuery;
-                    allQuery << "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" << deviceId << ", 'PH', "
-                             << ph << ");";
-                    mariaDB.exec(allQuery.str(), nullptr, nullptr);
+                    // Insert into PH_Readings
+                    mariaDB.exec("INSERT INTO PH_Readings (DeviceID, PH_Value) VALUES (" + std::to_string(deviceId) + ", " +
+                                     std::to_string(ph) + ");",
+                                 nullptr,
+                                 nullptr);
 
+                    // Insert into All_Sensor_Readings
+                    mariaDB.exec("INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
+                                     std::to_string(deviceId) + ", 'PH', " + std::to_string(ph) + ");",
+                                 nullptr,
+                                 nullptr);
                     break;
                 }
                 case 4: { // TDS
                     float tds = values.size() > 0 ? values[0] : 0.0f;
-                    std::ostringstream query;
-                    query << "INSERT INTO TDS_Readings (DeviceID, TDS_Value) VALUES (" << deviceId << ", " << tds << ");";
-                    mariaDB.exec(query.str(), nullptr, nullptr);
 
-                    std::ostringstream allQuery;
-                    allQuery << "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" << deviceId << ", 'TDS', "
-                             << tds << ");";
-                    mariaDB.exec(allQuery.str(), nullptr, nullptr);
+                    // Insert into TDS_Readings
+                    mariaDB.exec("INSERT INTO TDS_Readings (DeviceID, TDS_Value) VALUES (" + std::to_string(deviceId) + ", " +
+                                     std::to_string(tds) + ");",
+                                 nullptr,
+                                 nullptr);
 
+                    // Insert into All_Sensor_Readings
+                    mariaDB.exec("INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
+                                     std::to_string(deviceId) + ", 'TDS', " + std::to_string(tds) + ");",
+                                 nullptr,
+                                 nullptr);
                     break;
                 }
                 default:
