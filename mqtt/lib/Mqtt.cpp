@@ -434,93 +434,203 @@ namespace mqtt::mqtt::lib {
 
             VLOG(0) << "  Parsed " << values.size() << " values from payload";
 
-            // --- Store data into DB ---
-            switch (fPort) {
-                case 1: { // GPS
-                    if (values.size() < 3) {
-                        VLOG(0) << "Not enough values for GPS (need 3, got " << values.size() << ")";
-                        break;
-                    }
-
-                    float lat = values[0];
-                    float lon = values[1];
-                    float alt = values[2];
-
-                    std::string query1 = "INSERT INTO GPS_Readings (DeviceID, Latitude, Longitude, Altitude) VALUES (" +
-                                         std::to_string(deviceId) + ", " + std::to_string(lat) + ", " + std::to_string(lon) + ", " +
-                                         std::to_string(alt) + ");";
-
-                    std::string query2 =
-                        "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1, ReadingValue2, ReadingValue3) VALUES (" +
-                        std::to_string(deviceId) + ", 'GPS', " + std::to_string(lat) + ", " + std::to_string(lon) + ", " +
-                        std::to_string(alt) + ");";
-
-                    mariaDB.exec(query1);
-                    mariaDB.exec(query2);
-                    VLOG(0) << "GPS data inserted: lat=" << lat << ", lon=" << lon << ", alt=" << alt;
+                    // --- Store data into DB ---
+        switch (fPort) {
+            case 1: { // GPS
+                if (values.size() < 3) {
+                    VLOG(0) << "Not enough values for GPS (need 3, got " << values.size() << ")";
                     break;
                 }
-                case 2: { // Temperature
-                    if (values.empty()) {
-                        VLOG(0) << "No value for Temperature";
-                        break;
-                    }
 
-                    float temp = values[0];
+                float lat = values[0];
+                float lon = values[1];
+                float alt = values[2];
 
-                    std::string query1 = "INSERT INTO Temperature_Readings (DeviceID, Temperature_Value) VALUES (" +
-                                         std::to_string(deviceId) + ", " + std::to_string(temp) + ");";
+                std::string query1 =
+                    "INSERT INTO GPS_Readings (DeviceID, Latitude, Longitude, Altitude) VALUES (" +
+                    std::to_string(deviceId) + ", " +
+                    std::to_string(lat) + ", " +
+                    std::to_string(lon) + ", " +
+                    std::to_string(alt) + ");";
 
-                    std::string query2 = "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
-                                         std::to_string(deviceId) + ", 'Temperature', " + std::to_string(temp) + ");";
+                std::string query2 =
+                    "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1, ReadingValue2, ReadingValue3) VALUES (" +
+                    std::to_string(deviceId) + ", 'GPS', " +
+                    std::to_string(lat) + ", " +
+                    std::to_string(lon) + ", " +
+                    std::to_string(alt) + ");";
 
-                    mariaDB.exec(query1);
-                    mariaDB.exec(query2);
-                    VLOG(0) << "Temperature data inserted: " << temp;
-                    break;
-                }
-                case 3: { // PH
-                    if (values.empty()) {
-                        VLOG(0) << "No value for PH";
-                        break;
-                    }
+                mariaDB.exec(
+                    query1,
+                    [&mariaDB = this->mariaDB]() {
+                        VLOG(0) << "GPS query1 finished";
+                        mariaDB.affectedRows(
+                            [](my_ulonglong ar) { VLOG(0) << "  affected rows = " << ar; },
+                            [](const std::string& err, unsigned int no) { VLOG(0) << "  affectedRows error: " << err << " : " << no; });
+                    },
+                    [](const std::string& err, unsigned int no) {
+                        VLOG(0) << "GPS query1 failed: " << err << " : " << no;
+                    });
 
-                    float ph = values[0];
+                mariaDB.exec(
+                    query2,
+                    [&mariaDB = this->mariaDB]() {
+                        VLOG(0) << "GPS query2 finished";
+                        mariaDB.affectedRows(
+                            [](my_ulonglong ar) { VLOG(0) << "  affected rows = " << ar; },
+                            [](const std::string& err, unsigned int no) { VLOG(0) << "  affectedRows error: " << err << " : " << no; });
+                    },
+                    [](const std::string& err, unsigned int no) {
+                        VLOG(0) << "GPS query2 failed: " << err << " : " << no;
+                    });
 
-                    std::string query1 = "INSERT INTO PH_Readings (DeviceID, PH_Value) VALUES (" + std::to_string(deviceId) + ", " +
-                                         std::to_string(ph) + ");";
-
-                    std::string query2 = "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
-                                         std::to_string(deviceId) + ", 'PH', " + std::to_string(ph) + ");";
-
-                    mariaDB.exec(query1);
-                    mariaDB.exec(query2);
-                    VLOG(0) << "PH data inserted: " << ph;
-                    break;
-                }
-                case 4: { // TDS
-                    if (values.empty()) {
-                        VLOG(0) << "No value for TDS";
-                        break;
-                    }
-
-                    float tds = values[0];
-
-                    std::string query1 = "INSERT INTO TDS_Readings (DeviceID, TDS_Value) VALUES (" + std::to_string(deviceId) + ", " +
-                                         std::to_string(tds) + ");";
-
-                    std::string query2 = "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
-                                         std::to_string(deviceId) + ", 'TDS', " + std::to_string(tds) + ");";
-
-                    mariaDB.exec(query1);
-                    mariaDB.exec(query2);
-                    VLOG(0) << "TDS data inserted: " << tds;
-                    break;
-                }
-                default:
-                    VLOG(0) << "fPort " << static_cast<int>(fPort) << " not handled";
-                    break;
+                VLOG(0) << "GPS data inserted: lat=" << lat << ", lon=" << lon << ", alt=" << alt;
+                break;
             }
+
+            case 2: { // Temperature
+                if (values.empty()) {
+                    VLOG(0) << "No value for Temperature";
+                    break;
+                }
+
+                float temp = values[0];
+
+                std::string query1 =
+                    "INSERT INTO Temperature_Readings (DeviceID, Temperature_Value) VALUES (" +
+                    std::to_string(deviceId) + ", " +
+                    std::to_string(temp) + ");";
+
+                std::string query2 =
+                    "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
+                    std::to_string(deviceId) + ", 'Temperature', " +
+                    std::to_string(temp) + ");";
+
+                mariaDB.exec(
+                    query1,
+                    [&mariaDB = this->mariaDB]() {
+                        VLOG(0) << "Temp query1 finished";
+                        mariaDB.affectedRows(
+                            [](my_ulonglong ar) { VLOG(0) << "  affected rows = " << ar; },
+                            [](const std::string& err, unsigned int no) { VLOG(0) << "  affectedRows error: " << err << " : " << no; });
+                    },
+                    [](const std::string& err, unsigned int no) {
+                        VLOG(0) << "Temp query1 failed: " << err << " : " << no;
+                    });
+
+                mariaDB.exec(
+                    query2,
+                    [&mariaDB = this->mariaDB]() {
+                        VLOG(0) << "Temp query2 finished";
+                        mariaDB.affectedRows(
+                            [](my_ulonglong ar) { VLOG(0) << "  affected rows = " << ar; },
+                            [](const std::string& err, unsigned int no) { VLOG(0) << "  affectedRows error: " << err << " : " << no; });
+                    },
+                    [](const std::string& err, unsigned int no) {
+                        VLOG(0) << "Temp query2 failed: " << err << " : " << no;
+                    });
+
+                VLOG(0) << "Temperature data inserted: " << temp;
+                break;
+            }
+
+            case 3: { // PH
+                if (values.empty()) {
+                    VLOG(0) << "No value for PH";
+                    break;
+                }
+
+                float ph = values[0];
+
+                std::string query1 =
+                    "INSERT INTO PH_Readings (DeviceID, PH_Value) VALUES (" +
+                    std::to_string(deviceId) + ", " +
+                    std::to_string(ph) + ");";
+
+                std::string query2 =
+                    "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
+                    std::to_string(deviceId) + ", 'PH', " +
+                    std::to_string(ph) + ");";
+
+                mariaDB.exec(
+                    query1,
+                    [&mariaDB = this->mariaDB]() {
+                        VLOG(0) << "PH query1 finished";
+                        mariaDB.affectedRows(
+                            [](my_ulonglong ar) { VLOG(0) << "  affected rows = " << ar; },
+                            [](const std::string& err, unsigned int no) { VLOG(0) << "  affectedRows error: " << err << " : " << no; });
+                    },
+                    [](const std::string& err, unsigned int no) {
+                        VLOG(0) << "PH query1 failed: " << err << " : " << no;
+                    });
+
+                mariaDB.exec(
+                    query2,
+                    [&mariaDB = this->mariaDB]() {
+                        VLOG(0) << "PH query2 finished";
+                        mariaDB.affectedRows(
+                            [](my_ulonglong ar) { VLOG(0) << "  affected rows = " << ar; },
+                            [](const std::string& err, unsigned int no) { VLOG(0) << "  affectedRows error: " << err << " : " << no; });
+                    },
+                    [](const std::string& err, unsigned int no) {
+                        VLOG(0) << "PH query2 failed: " << err << " : " << no;
+                    });
+
+                VLOG(0) << "PH data inserted: " << ph;
+                break;
+            }
+
+            case 4: { // TDS
+                if (values.empty()) {
+                    VLOG(0) << "No value for TDS";
+                    break;
+                }
+
+                float tds = values[0];
+
+                std::string query1 =
+                    "INSERT INTO TDS_Readings (DeviceID, TDS_Value) VALUES (" +
+                    std::to_string(deviceId) + ", " +
+                    std::to_string(tds) + ");";
+
+                std::string query2 =
+                    "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
+                    std::to_string(deviceId) + ", 'TDS', " +
+                    std::to_string(tds) + ");";
+
+                mariaDB.exec(
+                    query1,
+                    [&mariaDB = this->mariaDB]() {
+                        VLOG(0) << "TDS query1 finished";
+                        mariaDB.affectedRows(
+                            [](my_ulonglong ar) { VLOG(0) << "  affected rows = " << ar; },
+                            [](const std::string& err, unsigned int no) { VLOG(0) << "  affectedRows error: " << err << " : " << no; });
+                    },
+                    [](const std::string& err, unsigned int no) {
+                        VLOG(0) << "TDS query1 failed: " << err << " : " << no;
+                    });
+
+                mariaDB.exec(
+                    query2,
+                    [&mariaDB = this->mariaDB]() {
+                        VLOG(0) << "TDS query2 finished";
+                        mariaDB.affectedRows(
+                            [](my_ulonglong ar) { VLOG(0) << "  affected rows = " << ar; },
+                            [](const std::string& err, unsigned int no) { VLOG(0) << "  affectedRows error: " << err << " : " << no; });
+                    },
+                    [](const std::string& err, unsigned int no) {
+                        VLOG(0) << "TDS query2 failed: " << err << " : " << no;
+                    });
+
+                VLOG(0) << "TDS data inserted: " << tds;
+                break;
+            }
+
+            default:
+                VLOG(0) << "fPort " << static_cast<int>(fPort) << " not handled";
+                break;
+        }
+
 
         } catch (json::parse_error& e) {
             VLOG(0) << "JSON parse error: " << e.what();
