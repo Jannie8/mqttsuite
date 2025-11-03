@@ -58,6 +58,7 @@
 #include <map>
 #include <mysql.h>
 #include <nlohmann/json_fwd.hpp>
+#include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -377,24 +378,19 @@ namespace mqtt::mqtt::lib {
     void Mqtt::onPublish(const iot::mqtt::packets::Publish& publish) {
         // --- Log topic and payload ---
         std::string topic = publish.getTopic();
-        const std::vector<uint8_t>& payloadVec = publish.getPayload(); // assume getPayload() returns vector<uint8_t>
 
-        std::ostringstream payloadHex;
-        for (auto b : payloadVec)
-            payloadHex << std::hex << std::uppercase << (int) b << " ";
+        // Use getMessage() because getPayload() doesn't exist
+        std::string payloadStr = publish.getMessage();
+
         VLOG(0) << "Received MQTT message";
         VLOG(0) << "  Topic: " << topic;
-        VLOG(0) << "  Payload (hex): " << payloadHex.str();
-
-        // --- Convert payload to string ---
-        std::string payloadStr(payloadVec.begin(), payloadVec.end());
         VLOG(0) << "  Payload (string): " << payloadStr;
 
         // --- Determine fPort and deviceId ---
-        uint8_t fPort = 1; // <- replace with actual value if available in payload or topic
-        int deviceId = 1;  // <- can be extracted from topic, e.g., "devices/1/temperature"
+        uint8_t fPort = 1; // <- replace with actual value if available
+        int deviceId = 1;  // <- can be extracted from topic
 
-        // Attempt to extract deviceId from topic: "devices/<id>/..."
+        // Extract deviceId from topic "devices/<id>/..."
         {
             std::regex rgx("devices/(\\d+)/");
             std::smatch match;
@@ -415,7 +411,7 @@ namespace mqtt::mqtt::lib {
             }
         }
 
-        // --- Store data into appropriate tables ---
+        // --- Store data into DB ---
         try {
             switch (fPort) {
                 case 1: { // GPS
@@ -423,13 +419,11 @@ namespace mqtt::mqtt::lib {
                     float lon = values.size() > 1 ? values[1] : 0.0f;
                     float alt = values.size() > 2 ? values[2] : 0.0f;
 
-                    // Insert into GPS_Readings
                     mariaDB.exec("INSERT INTO GPS_Readings (DeviceID, Latitude, Longitude, Altitude) VALUES (" + std::to_string(deviceId) +
                                      ", " + std::to_string(lat) + ", " + std::to_string(lon) + ", " + std::to_string(alt) + ");",
                                  nullptr,
                                  nullptr);
 
-                    // Insert into All_Sensor_Readings
                     mariaDB.exec(
                         "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1, ReadingValue2, ReadingValue3) VALUES (" +
                             std::to_string(deviceId) + ", 'GPS', " + std::to_string(lat) + ", " + std::to_string(lon) + ", " +
@@ -440,14 +434,11 @@ namespace mqtt::mqtt::lib {
                 }
                 case 2: { // Temperature
                     float temp = values.size() > 0 ? values[0] : 0.0f;
-
-                    // Insert into Temperature_Readings
                     mariaDB.exec("INSERT INTO Temperature_Readings (DeviceID, Temperature_Value) VALUES (" + std::to_string(deviceId) +
                                      ", " + std::to_string(temp) + ");",
                                  nullptr,
                                  nullptr);
 
-                    // Insert into All_Sensor_Readings
                     mariaDB.exec("INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
                                      std::to_string(deviceId) + ", 'Temperature', " + std::to_string(temp) + ");",
                                  nullptr,
@@ -456,14 +447,11 @@ namespace mqtt::mqtt::lib {
                 }
                 case 3: { // PH
                     float ph = values.size() > 0 ? values[0] : 0.0f;
-
-                    // Insert into PH_Readings
                     mariaDB.exec("INSERT INTO PH_Readings (DeviceID, PH_Value) VALUES (" + std::to_string(deviceId) + ", " +
                                      std::to_string(ph) + ");",
                                  nullptr,
                                  nullptr);
 
-                    // Insert into All_Sensor_Readings
                     mariaDB.exec("INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
                                      std::to_string(deviceId) + ", 'PH', " + std::to_string(ph) + ");",
                                  nullptr,
@@ -472,14 +460,11 @@ namespace mqtt::mqtt::lib {
                 }
                 case 4: { // TDS
                     float tds = values.size() > 0 ? values[0] : 0.0f;
-
-                    // Insert into TDS_Readings
                     mariaDB.exec("INSERT INTO TDS_Readings (DeviceID, TDS_Value) VALUES (" + std::to_string(deviceId) + ", " +
                                      std::to_string(tds) + ");",
                                  nullptr,
                                  nullptr);
 
-                    // Insert into All_Sensor_Readings
                     mariaDB.exec("INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
                                      std::to_string(deviceId) + ", 'TDS', " + std::to_string(tds) + ");",
                                  nullptr,
