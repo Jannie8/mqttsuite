@@ -398,7 +398,7 @@ namespace mqtt::mqtt::lib {
             auto uplink = j["uplink_message"];
 
             // Get fPort
-            uint8_t fPort = uplink.value("f_port", 0);
+            uint8_t fPort = static_cast<uint8_t>(uplink.value("f_port", 0));
             VLOG(0) << "  fPort: " << static_cast<int>(fPort);
 
             // Get device_id
@@ -417,7 +417,7 @@ namespace mqtt::mqtt::lib {
             std::string frmPayloadBase64 = uplink["frm_payload"];
 
             // Decode base64 payload
-            std::string decodedPayload = utils::base64_decode(frmPayloadBase64);
+            std::string decodedPayload = base64::base64_decode(frmPayloadBase64);
             VLOG(0) << "  Decoded payload length: " << decodedPayload.size();
 
             // Parse decoded payload as comma-separated values
