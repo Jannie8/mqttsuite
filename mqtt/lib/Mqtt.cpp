@@ -378,105 +378,154 @@ namespace mqtt::mqtt::lib {
     void Mqtt::onPublish(const iot::mqtt::packets::Publish& publish) {
         // --- Log topic and payload ---
         std::string topic = publish.getTopic();
-
-        // Use getMessage() because getPayload() doesn't exist
         std::string payloadStr = publish.getMessage();
 
         VLOG(0) << "Received MQTT message";
         VLOG(0) << "  Topic: " << topic;
         VLOG(0) << "  Payload (string): " << payloadStr;
 
-        // --- Determine fPort and deviceId ---
-        uint8_t fPort = 1; // <- replace with actual value if available
-        int deviceId = 1;  // <- can be extracted from topic
-
-        // Extract deviceId from topic "devices/<id>/..."
-        {
-            std::regex rgx("devices/(\\d+)/");
-            std::smatch match;
-            if (std::regex_search(topic, match, rgx)) {
-                deviceId = std::stoi(match[1].str());
-            }
-        }
-
-        // --- Parse payload into numeric values ---
-        std::vector<float> values;
-        std::istringstream ss(payloadStr);
-        std::string token;
-        while (std::getline(ss, token, ',')) {
-            try {
-                values.push_back(std::stof(token));
-            } catch (...) {
-                values.push_back(0.0f);
-            }
-        }
-
-        // --- Store data into DB ---
+        // --- Parse JSON payload ---
         try {
+            json j = json::parse(payloadStr);
+
+            // Check if this is a TTN uplink message
+            if (!j.contains("uplink_message")) {
+                VLOG(0) << "Not an uplink message, skipping";
+                return;
+            }
+
+            // Extract data from JSON
+            auto uplink = j["uplink_message"];
+
+            // Get fPort
+            uint8_t fPort = uplink.value("f_port", 0);
+            VLOG(0) << "  fPort: " << static_cast<int>(fPort);
+
+            // Get device_id
+            std::string deviceIdStr = j["end_device_ids"].value("device_id", "unknown");
+            int deviceId = 1; // default
+
+            // Try to extract numeric ID from device string if needed
+            VLOG(0) << "  Device: " << deviceIdStr;
+
+            // Get frm_payload (base64 encoded)
+            if (!uplink.contains("frm_payload")) {
+                VLOG(0) << "No frm_payload found";
+                return;
+            }
+
+            std::string frmPayloadBase64 = uplink["frm_payload"];
+
+            // Decode base64 payload
+            std::string decodedPayload = utils::base64_decode(frmPayloadBase64);
+            VLOG(0) << "  Decoded payload length: " << decodedPayload.size();
+
+            // Parse decoded payload as comma-separated values
+            std::vector<float> values;
+            std::istringstream ss(decodedPayload);
+            std::string token;
+            while (std::getline(ss, token, ',')) {
+                try {
+                    values.push_back(std::stof(token));
+                } catch (...) {
+                    VLOG(0) << "  Could not parse token as float: " << token;
+                }
+            }
+
+            VLOG(0) << "  Parsed " << values.size() << " values from payload";
+
+            // --- Store data into DB ---
             switch (fPort) {
                 case 1: { // GPS
-                    float lat = values.size() > 0 ? values[0] : 0.0f;
-                    float lon = values.size() > 1 ? values[1] : 0.0f;
-                    float alt = values.size() > 2 ? values[2] : 0.0f;
+                    if (values.size() < 3) {
+                        VLOG(0) << "Not enough values for GPS (need 3, got " << values.size() << ")";
+                        break;
+                    }
 
-                    mariaDB.exec("INSERT INTO GPS_Readings (DeviceID, Latitude, Longitude, Altitude) VALUES (" + std::to_string(deviceId) +
-                                     ", " + std::to_string(lat) + ", " + std::to_string(lon) + ", " + std::to_string(alt) + ");",
-                                 nullptr,
-                                 nullptr);
+                    float lat = values[0];
+                    float lon = values[1];
+                    float alt = values[2];
 
-                    mariaDB.exec(
+                    std::string query1 = "INSERT INTO GPS_Readings (DeviceID, Latitude, Longitude, Altitude) VALUES (" +
+                                         std::to_string(deviceId) + ", " + std::to_string(lat) + ", " + std::to_string(lon) + ", " +
+                                         std::to_string(alt) + ");";
+
+                    std::string query2 =
                         "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1, ReadingValue2, ReadingValue3) VALUES (" +
-                            std::to_string(deviceId) + ", 'GPS', " + std::to_string(lat) + ", " + std::to_string(lon) + ", " +
-                            std::to_string(alt) + ");",
-                        nullptr,
-                        nullptr);
+                        std::to_string(deviceId) + ", 'GPS', " + std::to_string(lat) + ", " + std::to_string(lon) + ", " +
+                        std::to_string(alt) + ");";
+
+                    mariaDB.exec(query1);
+                    mariaDB.exec(query2);
+                    VLOG(0) << "GPS data inserted: lat=" << lat << ", lon=" << lon << ", alt=" << alt;
                     break;
                 }
                 case 2: { // Temperature
-                    float temp = values.size() > 0 ? values[0] : 0.0f;
-                    mariaDB.exec("INSERT INTO Temperature_Readings (DeviceID, Temperature_Value) VALUES (" + std::to_string(deviceId) +
-                                     ", " + std::to_string(temp) + ");",
-                                 nullptr,
-                                 nullptr);
+                    if (values.empty()) {
+                        VLOG(0) << "No value for Temperature";
+                        break;
+                    }
 
-                    mariaDB.exec("INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
-                                     std::to_string(deviceId) + ", 'Temperature', " + std::to_string(temp) + ");",
-                                 nullptr,
-                                 nullptr);
+                    float temp = values[0];
+
+                    std::string query1 = "INSERT INTO Temperature_Readings (DeviceID, Temperature_Value) VALUES (" +
+                                         std::to_string(deviceId) + ", " + std::to_string(temp) + ");";
+
+                    std::string query2 = "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
+                                         std::to_string(deviceId) + ", 'Temperature', " + std::to_string(temp) + ");";
+
+                    mariaDB.exec(query1);
+                    mariaDB.exec(query2);
+                    VLOG(0) << "Temperature data inserted: " << temp;
                     break;
                 }
                 case 3: { // PH
-                    float ph = values.size() > 0 ? values[0] : 0.0f;
-                    mariaDB.exec("INSERT INTO PH_Readings (DeviceID, PH_Value) VALUES (" + std::to_string(deviceId) + ", " +
-                                     std::to_string(ph) + ");",
-                                 nullptr,
-                                 nullptr);
+                    if (values.empty()) {
+                        VLOG(0) << "No value for PH";
+                        break;
+                    }
 
-                    mariaDB.exec("INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
-                                     std::to_string(deviceId) + ", 'PH', " + std::to_string(ph) + ");",
-                                 nullptr,
-                                 nullptr);
+                    float ph = values[0];
+
+                    std::string query1 = "INSERT INTO PH_Readings (DeviceID, PH_Value) VALUES (" + std::to_string(deviceId) + ", " +
+                                         std::to_string(ph) + ");";
+
+                    std::string query2 = "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
+                                         std::to_string(deviceId) + ", 'PH', " + std::to_string(ph) + ");";
+
+                    mariaDB.exec(query1);
+                    mariaDB.exec(query2);
+                    VLOG(0) << "PH data inserted: " << ph;
                     break;
                 }
                 case 4: { // TDS
-                    float tds = values.size() > 0 ? values[0] : 0.0f;
-                    mariaDB.exec("INSERT INTO TDS_Readings (DeviceID, TDS_Value) VALUES (" + std::to_string(deviceId) + ", " +
-                                     std::to_string(tds) + ");",
-                                 nullptr,
-                                 nullptr);
+                    if (values.empty()) {
+                        VLOG(0) << "No value for TDS";
+                        break;
+                    }
 
-                    mariaDB.exec("INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
-                                     std::to_string(deviceId) + ", 'TDS', " + std::to_string(tds) + ");",
-                                 nullptr,
-                                 nullptr);
+                    float tds = values[0];
+
+                    std::string query1 = "INSERT INTO TDS_Readings (DeviceID, TDS_Value) VALUES (" + std::to_string(deviceId) + ", " +
+                                         std::to_string(tds) + ");";
+
+                    std::string query2 = "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1) VALUES (" +
+                                         std::to_string(deviceId) + ", 'TDS', " + std::to_string(tds) + ");";
+
+                    mariaDB.exec(query1);
+                    mariaDB.exec(query2);
+                    VLOG(0) << "TDS data inserted: " << tds;
                     break;
                 }
                 default:
                     VLOG(0) << "fPort " << static_cast<int>(fPort) << " not handled";
                     break;
             }
+
+        } catch (json::parse_error& e) {
+            VLOG(0) << "JSON parse error: " << e.what();
         } catch (std::exception& e) {
-            VLOG(0) << "DB Insert Error: " << e.what();
+            VLOG(0) << "Error processing message: " << e.what();
         }
     }
 
