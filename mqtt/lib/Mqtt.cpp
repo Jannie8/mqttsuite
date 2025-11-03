@@ -377,9 +377,10 @@ namespace mqtt::mqtt::lib {
     void Mqtt::onPublish(const iot::mqtt::packets::Publish& publish) {
         VLOG(0) << "Received MQTT message";
 
-        std::string payloadStr = publish.getPayload();
-        std::vector<float> values;
+        // Convert payload bytes to string
+        std::string payloadStr(publish.payload.begin(), publish.payload.end());
 
+        std::vector<float> values;
         std::istringstream ss(payloadStr);
         std::string token;
         while (std::getline(ss, token, ',')) {
@@ -390,9 +391,8 @@ namespace mqtt::mqtt::lib {
             }
         }
 
-        uint8_t fPort = 1;
-
-        int deviceId = 1;
+        uint8_t fPort = 1; // <- заменить на реальное значение, если есть
+        int deviceId = 1;  // <- назначаем DeviceID, можно разбирать из topic или payload
 
         try {
             switch (fPort) {
@@ -406,7 +406,6 @@ namespace mqtt::mqtt::lib {
                           << ", " << lon << ", " << alt << ");";
                     mariaDB.exec(query.str(), nullptr, nullptr);
 
-                    // also save to All_Sensor_Readings
                     std::ostringstream allQuery;
                     allQuery
                         << "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1, ReadingValue2, ReadingValue3) VALUES ("
