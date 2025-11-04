@@ -627,6 +627,59 @@ namespace mqtt::mqtt::lib {
                 break;
             }
 
+                        case 5: { // Turbidity
+                if (values.empty()) {
+                    VLOG(0) << "No value for Turbidity";
+                    break;
+                }
+
+                float ntu     = values[0];
+                // if one day you send "ntu,voltage" from the ESP32, we can grab it:
+                float voltage = (values.size() > 1) ? values[1] : 0.0f;
+
+                // 1) insert into your dedicated table
+                std::string query1 =
+                    "INSERT INTO Turbidity_Readings (DeviceID, SensorName, NTU_Value, Voltage) VALUES (" +
+                    std::to_string(deviceId) + ", 'Turbidity_Sensor', " +
+                    std::to_string(ntu) + ", " +
+                    std::to_string(voltage) + ");";
+
+                // 2) also into the generic table
+                std::string query2 =
+                    "INSERT INTO All_Sensor_Readings (DeviceID, SensorType, ReadingValue1, ReadingValue2) VALUES (" +
+                    std::to_string(deviceId) + ", 'Turbidity', " +
+                    std::to_string(ntu) + ", " +
+                    std::to_string(voltage) + ");";
+
+                mariaDB.exec(
+                    query1,
+                    [&mariaDB = this->mariaDB]() {
+                        VLOG(0) << "Turbidity query1 finished";
+                        mariaDB.affectedRows(
+                            [](my_ulonglong ar) { VLOG(0) << "  affected rows = " << ar; },
+                            [](const std::string& err, unsigned int no) { VLOG(0) << "  affectedRows error: " << err << " : " << no; });
+                    },
+                    [](const std::string& err, unsigned int no) {
+                        VLOG(0) << "Turbidity query1 failed: " << err << " : " << no;
+                    });
+
+                mariaDB.exec(
+                    query2,
+                    [&mariaDB = this->mariaDB]() {
+                        VLOG(0) << "Turbidity query2 finished";
+                        mariaDB.affectedRows(
+                            [](my_ulonglong ar) { VLOG(0) << "  affected rows = " << ar; },
+                            [](const std::string& err, unsigned int no) { VLOG(0) << "  affectedRows error: " << err << " : " << no; });
+                    },
+                    [](const std::string& err, unsigned int no) {
+                        VLOG(0) << "Turbidity query2 failed: " << err << " : " << no;
+                    });
+
+                VLOG(0) << "Turbidity data inserted: NTU=" << ntu << "  Voltage=" << voltage;
+                break;
+            }
+
+
             default:
                 VLOG(0) << "fPort " << static_cast<int>(fPort) << " not handled";
                 break;
